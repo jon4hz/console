@@ -66,8 +66,10 @@ func TestEchoCmdWithHandler(t *testing.T) {
 
 func TestMatchEchoCmd(t *testing.T) {
 	assert.True(t, echoCmd.Match("echo"))
+	assert.True(t, echoCmd.Match("echo test"))
 }
 
 func TestMismatchEchoCmd(t *testing.T) {
 	assert.False(t, echoCmd.Match("foo"))
+	assert.False(t, echoCmd.Match("foo test"))
 }

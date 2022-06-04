@@ -3,6 +3,7 @@ package console
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/muesli/termenv"
 )
@@ -27,6 +28,7 @@ type Cmd struct {
 }
 
 func (c *Cmd) defaultMatcher(cmd string) bool {
+	cmd, _ = splitCmdArgs(cmd)
 	if cmd == c.Name {
 		return true
 	}
@@ -36,6 +38,11 @@ func (c *Cmd) defaultMatcher(cmd string) bool {
 		}
 	}
 	return false
+}
+
+func splitCmdArgs(cmd string) (string, []string) {
+	args := strings.Split(cmd, " ")
+	return args[0], args[1:]
 }
 
 func (c *Cmd) Match(cmd string) bool {
