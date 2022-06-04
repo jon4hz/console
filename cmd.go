@@ -10,7 +10,6 @@ import (
 var (
 	ErrCmdNoHandler = errors.New("command has no handler")
 )
-
 var defaultCmds = []*Cmd{
 	helpCmd,
 	clearCmd,
@@ -50,7 +49,7 @@ func (c *Cmd) Match(cmd string) bool {
 }
 
 func (c *Cmd) Handle(cmd string) error {
-	if !c.Console.isOsPipe && c.IgnorePipe {
+	if c.Console.isOsPipe && c.IgnorePipe {
 		return nil
 	}
 	if c.Handler != nil {

@@ -66,8 +66,8 @@ func New(opts ...Opts) (*Console, error) {
 		liner:       liner.NewLiner(),
 		historyFile: defaultHistoryFile,
 		exitCmd:     quitCmd,
-		cmds:        defaultCmds,
 	}
+	quitCmd.Console = c
 	c.liner.SetCtrlCAborts(true)
 
 	// check if stdin is a pipe
@@ -84,7 +84,7 @@ func New(opts ...Opts) (*Console, error) {
 	ctx, cancel := context.WithCancel(c.parentCtx)
 	c.ctx = ctx
 	c.cancel = cancel
-
+	c.RegisterCommands(defaultCmds...)
 	c.setCompleter()
 
 	return c, nil
@@ -176,7 +176,7 @@ func (c *Console) read() error {
 				}
 				c.liner.AppendHistory(in)
 				if exit, err := c.handleInput(in); err != nil {
-					fmt.Println(styleError.Render(err.Error()))
+					fmt.Println(StyleError.Render(err.Error()))
 				} else if exit { // prevent an unnecessary newline
 					break
 				}
@@ -186,7 +186,7 @@ func (c *Console) read() error {
 			} else if err == io.EOF {
 				break
 			} else {
-				fmt.Println(styleError.Render(fmt.Sprintf("Error reading line: %s", err)))
+				fmt.Println(StyleError.Render(fmt.Sprintf("Error reading line: %s", err)))
 				break
 			}
 		}
@@ -206,22 +206,22 @@ func (c *Console) readHistory() {
 		if os.IsNotExist(err) {
 			return
 		}
-		fmt.Println(styleError.Render(fmt.Sprintf("Error opening history file: %s", err)))
+		fmt.Println(StyleError.Render(fmt.Sprintf("Error opening history file: %s", err)))
 	}
 	defer f.Close()
 	if _, err := c.liner.ReadHistory(f); err != nil {
-		fmt.Println(styleError.Render(fmt.Sprintf("Error reading history file: %s", err)))
+		fmt.Println(StyleError.Render(fmt.Sprintf("Error reading history file: %s", err)))
 	}
 }
 
 func (c *Console) writeHistory() {
 	f, err := os.Create(c.historyFile)
 	if err != nil {
-		fmt.Println(styleError.Render(fmt.Sprintf("Error creating history file: %s", err)))
+		fmt.Println(StyleError.Render(fmt.Sprintf("Error creating history file: %s", err)))
 	}
 	defer f.Close()
 	if _, err := c.liner.WriteHistory(f); err != nil {
-		fmt.Println(styleError.Render(fmt.Sprintf("Error writing history file: %s", err)))
+		fmt.Println(StyleError.Render(fmt.Sprintf("Error writing history file: %s", err)))
 	}
 }
 
@@ -234,7 +234,7 @@ func (c *Console) handleInput(input string) (exit bool, err error) {
 	for _, cmd := range c.cmds {
 		if cmd.Match(input) {
 			if err := cmd.Handle(input); err != nil {
-				fmt.Println(styleError.Render(fmt.Sprintf("error running command %s: %s\n", cmd.Name, err)))
+				fmt.Println(StyleError.Render(fmt.Sprintf("error running command %s: %s\n", cmd.Name, err)))
 			}
 			return false, nil
 		}
