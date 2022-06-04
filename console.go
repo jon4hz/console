@@ -16,6 +16,12 @@ var defaultHistoryFile = filepath.Join(os.TempDir(), ".console_history")
 
 type Opts func(*Console)
 
+func WithPrompt(prompt string) Opts {
+	return func(c *Console) {
+		c.prompt = prompt
+	}
+}
+
 func WithExitCmd(e *Cmd) Opts {
 	return func(c *Console) {
 		c.exitCmd = e
@@ -46,6 +52,12 @@ func WithHandleCtrlC(handle bool) Opts {
 	}
 }
 
+func WithDynamicPrompt(promtC <-chan string) Opts {
+	return func(c *Console) {
+		c.promptC = promtC
+	}
+}
+
 type Console struct {
 	parentCtx context.Context
 	ctx       context.Context
@@ -55,6 +67,8 @@ type Console struct {
 	liner       *liner.State
 	historyFile string
 	welcomeMsg  string
+	prompt      string
+	promptC     <-chan string
 
 	cmds    []*Cmd
 	exitCmd *Cmd
@@ -66,6 +80,7 @@ func New(opts ...Opts) (*Console, error) {
 		liner:       liner.NewLiner(),
 		historyFile: defaultHistoryFile,
 		exitCmd:     quitCmd,
+		prompt:      "> ",
 	}
 	quitCmd.Console = c
 	c.liner.SetCtrlCAborts(true)
@@ -84,7 +99,9 @@ func New(opts ...Opts) (*Console, error) {
 	ctx, cancel := context.WithCancel(c.parentCtx)
 	c.ctx = ctx
 	c.cancel = cancel
-	c.RegisterCommands(defaultCmds...)
+	if err := c.RegisterCommands(defaultCmds...); err != nil {
+		return nil, err
+	}
 	c.setCompleter()
 
 	return c, nil
@@ -128,8 +145,25 @@ func (c *Console) Start() error {
 	if !c.isOsPipe {
 		c.printWelcomeMsg()
 	}
+	if c.promptC != nil {
+		go c.updatePrompt()
+	}
 	c.readHistory()
 	return c.read()
+}
+
+func (c *Console) updatePrompt() {
+	for {
+		select {
+		case p, ok := <-c.promptC:
+			if !ok {
+				return
+			}
+			c.prompt = p
+		case <-c.ctx.Done():
+			return
+		}
+	}
 }
 
 func (c *Console) Close() error {
@@ -169,7 +203,7 @@ func (c *Console) read() error {
 	go func() {
 		defer close(doneC)
 		for {
-			if in, err := c.liner.Prompt("> "); err == nil {
+			if in, err := c.liner.Prompt(c.prompt); err == nil {
 				in = strings.TrimSpace(in)
 				if in == "" {
 					continue
