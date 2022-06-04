@@ -23,7 +23,7 @@ type Cmd struct {
 	IgnorePipe           bool
 	Matcher              func(cmd string) bool
 	IgnoreDefaultMatcher bool
-	Handler              func(c *Console, cmd string) error
+	Handler              func(c *Console, args []string) error
 	Console              *Console
 }
 
@@ -60,7 +60,8 @@ func (c *Cmd) Handle(cmd string) error {
 		return nil
 	}
 	if c.Handler != nil {
-		return c.Handler(c.Console, cmd)
+		_, args := splitCmdArgs(cmd)
+		return c.Handler(c.Console, args)
 	}
 	return ErrCmdNoHandler
 }
@@ -68,7 +69,7 @@ func (c *Cmd) Handle(cmd string) error {
 var helpCmd = &Cmd{
 	Name:        "help",
 	Description: "Show the help",
-	Handler: func(c *Console, cmd string) error {
+	Handler: func(c *Console, args []string) error {
 		fmt.Println(helpView(c))
 		return nil
 	},
@@ -92,7 +93,7 @@ var quitCmd = &Cmd{
 	Aliases:     []string{"exit"},
 	Description: "Quit the console",
 	IgnorePipe:  true,
-	Handler: func(c *Console, cmd string) error {
+	Handler: func(c *Console, args []string) error {
 		c.Close()
 		return nil
 	},
@@ -102,7 +103,7 @@ var clearCmd = &Cmd{
 	Name:        "clear",
 	Description: "Clear the screen",
 	IgnorePipe:  true,
-	Handler: func(c *Console, cmd string) error {
+	Handler: func(c *Console, args []string) error {
 		termenv.ClearScreen()
 		return nil
 	},

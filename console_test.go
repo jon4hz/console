@@ -56,8 +56,8 @@ func TestEchoCmdWithHandler(t *testing.T) {
 	err = c.RegisterCommands(echoCmd)
 	assert.NoError(t, err)
 
-	echoCmd.Handler = func(c *console.Console, cmd string) error {
-		fmt.Println(strings.Join(strings.Split(cmd, " ")[1:], " "))
+	echoCmd.Handler = func(c *console.Console, args []string) error {
+		fmt.Println(strings.Join(args, " "))
 		return nil
 	}
 	err = echoCmd.Handle("echo")
