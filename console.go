@@ -208,7 +208,7 @@ func (c *Console) read() error {
 				if in == "" {
 					continue
 				}
-				c.liner.AppendHistory(in)
+				c.appendHistory(in)
 				if exit, err := c.handleInput(in); err != nil {
 					fmt.Println(StyleError.Render(err.Error()))
 				} else if exit { // prevent an unnecessary newline
@@ -235,6 +235,9 @@ func (c *Console) read() error {
 }
 
 func (c *Console) readHistory() {
+	if c.historyFile == "" {
+		return
+	}
 	f, err := os.Open(c.historyFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -249,6 +252,9 @@ func (c *Console) readHistory() {
 }
 
 func (c *Console) writeHistory() {
+	if c.historyFile == "" {
+		return
+	}
 	f, err := os.Create(c.historyFile)
 	if err != nil {
 		fmt.Println(StyleError.Render(fmt.Sprintf("Error creating history file: %s", err)))
@@ -257,6 +263,13 @@ func (c *Console) writeHistory() {
 	if _, err := c.liner.WriteHistory(f); err != nil {
 		fmt.Println(StyleError.Render(fmt.Sprintf("Error writing history file: %s", err)))
 	}
+}
+
+func (c *Console) appendHistory(in string) {
+	if c.historyFile == "" {
+		return
+	}
+	c.liner.AppendHistory(in)
 }
 
 func (c *Console) handleInput(input string) (exit bool, err error) {
