@@ -291,3 +291,7 @@ func (c *Console) handleInput(input string) (exit bool, err error) {
 	}
 	return false, nil
 }
+
+func (c *Console) Ctx() context.Context {
+	return c.ctx
+}
