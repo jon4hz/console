@@ -16,6 +16,12 @@ var defaultHistoryFile = filepath.Join(os.TempDir(), ".console_history")
 
 type Opts func(*Console)
 
+func WithPrompt(prompt string) Opts {
+	return func(c *Console) {
+		c.prompt = prompt
+	}
+}
+
 func WithExitCmd(e *Cmd) Opts {
 	return func(c *Console) {
 		c.exitCmd = e
@@ -46,6 +52,12 @@ func WithHandleCtrlC(handle bool) Opts {
 	}
 }
 
+func WithDynamicPrompt(promtC <-chan string) Opts {
+	return func(c *Console) {
+		c.promptC = promtC
+	}
+}
+
 type Console struct {
 	parentCtx context.Context
 	ctx       context.Context
@@ -55,6 +67,8 @@ type Console struct {
 	liner       *liner.State
 	historyFile string
 	welcomeMsg  string
+	prompt      string
+	promptC     <-chan string
 
 	cmds    []*Cmd
 	exitCmd *Cmd
@@ -66,6 +80,7 @@ func New(opts ...Opts) (*Console, error) {
 		liner:       liner.NewLiner(),
 		historyFile: defaultHistoryFile,
 		exitCmd:     quitCmd,
+		prompt:      "> ",
 	}
 	quitCmd.Console = c
 	c.liner.SetCtrlCAborts(true)
@@ -84,7 +99,9 @@ func New(opts ...Opts) (*Console, error) {
 	ctx, cancel := context.WithCancel(c.parentCtx)
 	c.ctx = ctx
 	c.cancel = cancel
-	c.RegisterCommands(defaultCmds...)
+	if err := c.RegisterCommands(defaultCmds...); err != nil {
+		return nil, err
+	}
 	c.setCompleter()
 
 	return c, nil
@@ -128,8 +145,25 @@ func (c *Console) Start() error {
 	if !c.isOsPipe {
 		c.printWelcomeMsg()
 	}
+	if c.promptC != nil {
+		go c.updatePrompt()
+	}
 	c.readHistory()
 	return c.read()
+}
+
+func (c *Console) updatePrompt() {
+	for {
+		select {
+		case p, ok := <-c.promptC:
+			if !ok {
+				return
+			}
+			c.prompt = p
+		case <-c.ctx.Done():
+			return
+		}
+	}
 }
 
 func (c *Console) Close() error {
@@ -145,7 +179,10 @@ func (c *Console) ExitCmd() (*Cmd, bool) {
 
 func (c *Console) setCompleter() {
 	c.liner.SetCompleter(func(line string) (s []string) {
-		for _, n := range c.cmds {
+		for _, n := range append(c.cmds, c.exitCmd) {
+			if n == nil {
+				continue
+			}
 			if strings.HasPrefix(n.Name, strings.ToLower(line)) {
 				s = append(s, n.Name)
 				continue
@@ -169,12 +206,12 @@ func (c *Console) read() error {
 	go func() {
 		defer close(doneC)
 		for {
-			if in, err := c.liner.Prompt("> "); err == nil {
+			if in, err := c.liner.Prompt(c.prompt); err == nil {
 				in = strings.TrimSpace(in)
 				if in == "" {
 					continue
 				}
-				c.liner.AppendHistory(in)
+				c.appendHistory(in)
 				if exit, err := c.handleInput(in); err != nil {
 					fmt.Println(StyleError.Render(err.Error()))
 				} else if exit { // prevent an unnecessary newline
@@ -201,6 +238,9 @@ func (c *Console) read() error {
 }
 
 func (c *Console) readHistory() {
+	if c.historyFile == "" {
+		return
+	}
 	f, err := os.Open(c.historyFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -215,6 +255,9 @@ func (c *Console) readHistory() {
 }
 
 func (c *Console) writeHistory() {
+	if c.historyFile == "" {
+		return
+	}
 	f, err := os.Create(c.historyFile)
 	if err != nil {
 		fmt.Println(StyleError.Render(fmt.Sprintf("Error creating history file: %s", err)))
@@ -223,6 +266,13 @@ func (c *Console) writeHistory() {
 	if _, err := c.liner.WriteHistory(f); err != nil {
 		fmt.Println(StyleError.Render(fmt.Sprintf("Error writing history file: %s", err)))
 	}
+}
+
+func (c *Console) appendHistory(in string) {
+	if c.historyFile == "" {
+		return
+	}
+	c.liner.AppendHistory(in)
 }
 
 func (c *Console) handleInput(input string) (exit bool, err error) {

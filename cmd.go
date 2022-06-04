@@ -3,6 +3,7 @@ package console
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/muesli/termenv"
 )
@@ -22,11 +23,12 @@ type Cmd struct {
 	IgnorePipe           bool
 	Matcher              func(cmd string) bool
 	IgnoreDefaultMatcher bool
-	Handler              func(c *Console, cmd string) error
+	Handler              func(c *Console, args []string) error
 	Console              *Console
 }
 
 func (c *Cmd) defaultMatcher(cmd string) bool {
+	cmd, _ = splitCmdArgs(cmd)
 	if cmd == c.Name {
 		return true
 	}
@@ -36,6 +38,11 @@ func (c *Cmd) defaultMatcher(cmd string) bool {
 		}
 	}
 	return false
+}
+
+func splitCmdArgs(cmd string) (string, []string) {
+	args := strings.Split(cmd, " ")
+	return args[0], args[1:]
 }
 
 func (c *Cmd) Match(cmd string) bool {
@@ -53,7 +60,8 @@ func (c *Cmd) Handle(cmd string) error {
 		return nil
 	}
 	if c.Handler != nil {
-		return c.Handler(c.Console, cmd)
+		_, args := splitCmdArgs(cmd)
+		return c.Handler(c.Console, args)
 	}
 	return ErrCmdNoHandler
 }
@@ -61,7 +69,7 @@ func (c *Cmd) Handle(cmd string) error {
 var helpCmd = &Cmd{
 	Name:        "help",
 	Description: "Show the help",
-	Handler: func(c *Console, cmd string) error {
+	Handler: func(c *Console, args []string) error {
 		fmt.Println(helpView(c))
 		return nil
 	},
@@ -74,6 +82,9 @@ func helpView(c *Console) string {
 			s += fmt.Sprintf("\n  %s - %s", cmd.Name, cmd.Description)
 		}
 	}
+	if c.exitCmd != nil {
+		s += fmt.Sprintf("\n  %s - Exit the console", c.exitCmd.Name)
+	}
 	return s
 }
 
@@ -82,7 +93,7 @@ var quitCmd = &Cmd{
 	Aliases:     []string{"exit"},
 	Description: "Quit the console",
 	IgnorePipe:  true,
-	Handler: func(c *Console, cmd string) error {
+	Handler: func(c *Console, args []string) error {
 		c.Close()
 		return nil
 	},
@@ -92,7 +103,7 @@ var clearCmd = &Cmd{
 	Name:        "clear",
 	Description: "Clear the screen",
 	IgnorePipe:  true,
-	Handler: func(c *Console, cmd string) error {
+	Handler: func(c *Console, args []string) error {
 		termenv.ClearScreen()
 		return nil
 	},
