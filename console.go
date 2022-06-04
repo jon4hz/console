@@ -179,7 +179,10 @@ func (c *Console) ExitCmd() (*Cmd, bool) {
 
 func (c *Console) setCompleter() {
 	c.liner.SetCompleter(func(line string) (s []string) {
-		for _, n := range c.cmds {
+		for _, n := range append(c.cmds, c.exitCmd) {
+			if n == nil {
+				continue
+			}
 			if strings.HasPrefix(n.Name, strings.ToLower(line)) {
 				s = append(s, n.Name)
 				continue
