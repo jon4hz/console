@@ -74,6 +74,9 @@ func helpView(c *Console) string {
 			s += fmt.Sprintf("\n  %s - %s", cmd.Name, cmd.Description)
 		}
 	}
+	if c.exitCmd != nil {
+		s += fmt.Sprintf("\n  %s - Exit the console", c.exitCmd.Name)
+	}
 	return s
 }
 
