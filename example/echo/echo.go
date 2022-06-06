@@ -17,12 +17,13 @@ func main() {
 
 	c, err := console.New(
 		console.WithWelcomeMsg(fmt.Sprintf("Hello %s!", u.Username)),
-		console.WithHandleCtrlC(true),
+		console.WithHandleCtrlC(false),
 	)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer c.Close()
+
 	if err := c.RegisterCommands(echoCmd); err != nil {
 		log.Fatalln(err)
 	}
